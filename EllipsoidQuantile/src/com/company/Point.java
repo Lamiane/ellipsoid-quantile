@@ -24,39 +24,34 @@ public class Point {
         // all credits to nok: https://gist.github.com/nok/73d07cc644a390fad9e9
         // for some weird reason nok_cov(X) = 0.8*numpy.cov(X)
 
-        int n = X.numRows();
+        int n_samples = X.numRows();
         SimpleMatrix Xt = X.transpose();
-        int m = Xt.numRows();
+        int m_dimensions = Xt.numRows();
 
         // Means:
-        SimpleMatrix x = new SimpleMatrix(m, 1);
-        for(int r=0; r<m; r++ ){
-            x.set(r, 0, Xt.extractVector(true, r).elementSum() / n);
+        SimpleMatrix means = new SimpleMatrix(m_dimensions, 1);
+        for(int r=0; r<m_dimensions; r++ ){
+            means.set(r, 0, Xt.extractVector(true, r).elementSum() / n_samples);
         }
-        // System.out.println(x);
 
         // Covariance matrix:
-        SimpleMatrix S = new SimpleMatrix(m, m);
-        for(int r=0; r<m; r++){
-            for(int c=0; c<m; c++){
+        SimpleMatrix cov_matrix = new SimpleMatrix(m_dimensions, m_dimensions);
+        for(int r=0; r<m_dimensions; r++){
+            for(int c=0; c<m_dimensions; c++){
                 if(r > c){
-                    S.set(r, c, S.get(c, r));
+                    cov_matrix.set(r, c, cov_matrix.get(c, r));
                 } else {
-                    double cov = Xt.extractVector(true, r).minus( x.get((r), 0) ).dot(Xt.extractVector(true, c).minus( x.get((c), 0) ).transpose());
-                    S.set(r, c, (cov / n));
+                    double cov = Xt.extractVector(true, r).minus( means.get((r), 0) ).dot(Xt.extractVector(true, c).minus( means.get((c), 0) ).transpose());
+                    cov_matrix.set(r, c, (cov / (n_samples-1)));
                 }
             }
         }
-        // System.out.println(S);
 
-        // Plotting:
-        for(int r=0; r<m; r++){
-            for(int c=0; c<m; c++) { System.out.print(S.get(r, c) + "\t\t\t"); }
-            System.out.print("\n");
-        }
-
-
-
+//        // Plotting:
+//        for(int r=0; r<m_dimensions; r++){
+//            for(int c=0; c<m_dimensions; c++) { System.out.print(cov_matrix.get(r, c) + "\t\t\t"); }
+//            System.out.print("\n");
+//        }
     }
 
 }
