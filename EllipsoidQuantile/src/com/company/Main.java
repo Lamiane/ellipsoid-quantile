@@ -16,7 +16,7 @@ public class Main {
         };
 
         SimpleMatrix X = new SimpleMatrix(data);
-        Point.cov(X);
+        EllipsoidQuantile.cov(X);
 
         // 504.0			360.0			180.0
         // 360.0			360.0			0.0
@@ -26,11 +26,11 @@ public class Main {
 
 
         double data2[][] = new double[][]{
-                {2,3}, {4, 5}, {3, 4}, {5, 7}, {2,8}
+                {3, 4}, {5, 7}, {2,8}
         };
 
         SimpleMatrix X2 = new SimpleMatrix(data2);
-        Point.cov(X2);
+        EllipsoidQuantile.cov(X2);
 
     }
 }
