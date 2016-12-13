@@ -1,13 +1,12 @@
 package com.company;
 
-import org.ejml.data.DenseMatrix64F;
-import org.ejml.ops.CovarianceOps;
-import org.ejml.simple.SimpleBase;
+import org.ejml.data.Complex64F;
 import org.ejml.simple.SimpleEVD;
 import org.ejml.simple.SimpleMatrix;
-
-import java.lang.reflect.Array;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.TreeSet;
 
 /**
  * Created by  nex on 30.11.16.
@@ -15,7 +14,7 @@ import java.util.*;
 
 public class EllipsoidQuantile {
 
-    public Object ellipsoidQuantile(SimpleMatrix data, float quantil){
+    public Object[] ellipsoidQuantile(SimpleMatrix data, float quantil){
         // data: sample per row, dimension per column (i.e. numpy default)
         //TODO po przetestowaniu zoptymalizowac //mniej linii, mniej obiektow, mniej wszystkiego
         assert 0 < quantil;
@@ -28,7 +27,11 @@ public class EllipsoidQuantile {
             mean.set(c, 0, data.extractVector(false, c).elementSum() / data.numRows());
         }
 
-        SimpleEVD EVD = cov.eig(); // wektory potrzebne na samym koncu do zwracania
+        SimpleEVD EVD_cov = cov.eig(); // wektory potrzebne na samym koncu do zwracania
+        SimpleMatrix[] eig_vects = new SimpleMatrix[EVD_cov.getNumberOfEigenvalues()];
+        for (int i = 0; i < eig_vects.length; i++) {
+            eig_vects[i] = EVD_cov.getEigenVector(i);
+        }
 
         // distances from the mean in the 'circular' space
         SimpleMatrix xcen = data.copy();
@@ -71,15 +74,60 @@ public class EllipsoidQuantile {
 
         // ========================
 
+        int index_outer = 1;
+        for (int i=0; i<qlevel.length; i++) {
+            if (qlevel[i] > quantil) {
+                index_outer++;
+            } else break;
+        }
+        int index_inner = index_outer + 1;
+
+        double[] temp = new double[qlevel.length+1];
+        temp[0] = 1;
+        for (int i=1; i<temp.length; i++) {
+            temp[i] = qlevel[i - 1];
+        }
+        qlevel = temp; // przypisanie referencji, zatem nie usuwamy temp
 
 
+        Double[] circled_java_is_stupid = new Double[circled_data.length];
+        for (int i=0; i<circled_data.length; i++) {
+            circled_java_is_stupid[i] = (Double) circled_data[i];
+        }
+        // maybe two lines below might be optimised
+        TreeSet<Double> distances_tmp = (TreeSet<Double>) new TreeSet<Double>( Arrays.asList(circled_java_is_stupid) ).descendingSet();
+        Double[] distances = distances_tmp.toArray(new Double[distances_tmp.size()]); // stackoverflow magic
 
+        double q_out = qlevel[index_outer - 1];
+        double d_out = distances[index_outer - 1];
 
+        double q_inn = 0;
+        double d_inn = 0;
 
+        if (index_outer != distances.length) {
+            q_inn = qlevel[index_inner - 1];
+            d_inn = distances[index_inner - 1];
+        }
 
+        double quantile_distance = d_inn + (d_out - d_inn) * ((quantil - q_inn) / (q_out - q_inn));
+        quantile_distance = quantile_distance * quantile_distance;
 
+        SimpleMatrix new_covariance = cov.scale(quantile_distance);
 
-        return null;
+        // ========================
+
+        SimpleEVD EVD_new_cov = cov.eig();
+        Complex64F[] new_covariance_eigen_values = new Complex64F[EVD_new_cov.getNumberOfEigenvalues()];
+        for (int i = 0; i < new_covariance_eigen_values.length; i++) {
+            new_covariance_eigen_values[i] = EVD_new_cov.getEigenvalue(i);
+        }
+
+        double[] radii = new double[new_covariance_eigen_values.length];
+        for (int i = 0; i < radii.length; i++) {
+            radii[i] = Math.sqrt(new_covariance_eigen_values[i].getReal());
+        }
+
+        return new Object[]{mean, radii, eig_vects};
     }
 
     static SimpleMatrix cov(SimpleMatrix X){
