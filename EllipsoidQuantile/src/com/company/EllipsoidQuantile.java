@@ -3,6 +3,7 @@ package com.company;
 import org.ejml.data.Complex64F;
 import org.ejml.simple.SimpleEVD;
 import org.ejml.simple.SimpleMatrix;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -14,30 +15,30 @@ import java.util.TreeSet;
 
 public class EllipsoidQuantile {
 
-    public static Object[] ellipsoidQuantile(SimpleMatrix data, double quantil){
+    public static Object[] ellipsoidQuantile(SimpleMatrix data, double quantile) {
         // data: sample per row, dimension per column (i.e. numpy default)
-        //TODO po przetestowaniu zoptymalizowac //mniej linii, mniej obiektow, mniej wszystkiego
-        assert 0 < quantil;
-        assert quantil < 1;
+        // TODO: might be optimised
+        assert 0 < quantile;
+        assert quantile < 1;
 
         SimpleMatrix cov = cov(data);
         SimpleMatrix inv_cov = cov.invert();
         SimpleMatrix mean = new SimpleMatrix(data.numCols(), 1);
-        for(int c=0; c<data.numCols(); c++ ){
+        for (int c = 0; c < data.numCols(); c++) {
             mean.set(c, 0, data.extractVector(false, c).elementSum() / data.numRows());
         }
 
-        SimpleEVD EVD_cov = cov.eig(); // wektory potrzebne na samym koncu do zwracania
+        SimpleEVD EVD_cov = cov.eig();
         SimpleMatrix[] eig_vects = new SimpleMatrix[EVD_cov.getNumberOfEigenvalues()];
         for (int i = 0; i < eig_vects.length; i++) {
             eig_vects[i] = EVD_cov.getEigenVector(i);
         }
 
-        // distances from the mean in the 'circular' space
+        // distances from the mean in the 'spherical' space
         SimpleMatrix xcen = data.copy();
-        for (int r=0; r < xcen.numRows(); r++){
+        for (int r = 0; r < xcen.numRows(); r++) {
             SimpleMatrix xcen_row = xcen.extractVector(true, r).minus(mean.transpose());
-            for(int c=0; c<xcen.numCols(); c++){
+            for (int c = 0; c < xcen.numCols(); c++) {
                 xcen.set(r, c, xcen_row.get(0, c));
             }
         }
@@ -58,18 +59,18 @@ public class EllipsoidQuantile {
             }
         }
 
-        TreeSet<Double> sortedKeys = (TreeSet<Double>)new TreeSet<Double>(n_at_distance.keySet()).descendingSet();
-        double[] qlevel = new double[sortedKeys.size()+1];
+        TreeSet<Double> sortedKeys = (TreeSet<Double>) new TreeSet<Double>(n_at_distance.keySet()).descendingSet();
+        double[] qlevel = new double[sortedKeys.size() + 1];
         qlevel[0] = 0;
         int idx = 1;
         Iterator<Double> itr = sortedKeys.iterator();
-        while(itr.hasNext()){
+        while (itr.hasNext()) {
             int how_many = n_at_distance.get(itr.next());
             qlevel[idx] = qlevel[idx - 1] + how_many;
             idx++;
         }
 
-        for(int i=0; i<qlevel.length; i++) {
+        for (int i = 0; i < qlevel.length; i++) {
             qlevel[i] = (n - qlevel[i]) / n;
         }
         qlevel = Arrays.copyOfRange(qlevel, 1, qlevel.length);
@@ -77,27 +78,27 @@ public class EllipsoidQuantile {
         // ========================
 
         int index_outer = 1;
-        for (int i=0; i<qlevel.length; i++) {
-            if (qlevel[i] > quantil) {
+        for (int i = 0; i < qlevel.length; i++) {
+            if (qlevel[i] > quantile) {
                 index_outer++;
             } else break;
         }
         int index_inner = index_outer + 1;
 
-        double[] temp = new double[qlevel.length+1];
+        double[] temp = new double[qlevel.length + 1];
         temp[0] = 1;
-        for (int i=1; i<temp.length; i++) {
+        for (int i = 1; i < temp.length; i++) {
             temp[i] = qlevel[i - 1];
         }
-        qlevel = temp; // przypisanie referencji, zatem nie usuwamy temp
+        qlevel = temp;
 
 
         Double[] circled_java_is_stupid = new Double[circled_data.length];
-        for (int i=0; i<circled_data.length; i++) {
+        for (int i = 0; i < circled_data.length; i++) {
             circled_java_is_stupid[i] = (Double) circled_data[i];
         }
         // maybe two lines below might be optimised
-        TreeSet<Double> distances_tmp = (TreeSet<Double>) new TreeSet<Double>( Arrays.asList(circled_java_is_stupid) ).descendingSet();
+        TreeSet<Double> distances_tmp = (TreeSet<Double>) new TreeSet<Double>(Arrays.asList(circled_java_is_stupid)).descendingSet();
         Double[] distances = distances_tmp.toArray(new Double[distances_tmp.size()]); // stackoverflow magic
 
         double q_out = qlevel[index_outer - 1];
@@ -111,7 +112,7 @@ public class EllipsoidQuantile {
             d_inn = distances[index_inner - 1];
         }
 
-        double quantile_distance = d_inn + (d_out - d_inn) * ((quantil - q_inn) / (q_out - q_inn));
+        double quantile_distance = d_inn + (d_out - d_inn) * ((quantile - q_inn) / (q_out - q_inn));
         quantile_distance = quantile_distance * quantile_distance;
 
         SimpleMatrix new_covariance = cov.scale(quantile_distance);
@@ -132,9 +133,8 @@ public class EllipsoidQuantile {
         return new Object[]{mean, radii, eig_vects};
     }
 
-    static SimpleMatrix cov(SimpleMatrix X){
+    static SimpleMatrix cov(SimpleMatrix X) {
         // all credits to nok: https://gist.github.com/nok/73d07cc644a390fad9e9
-        // TODO: needs testing
 
         int n_samples = X.numRows();
         SimpleMatrix Xt = X.transpose();
@@ -142,19 +142,19 @@ public class EllipsoidQuantile {
 
         // Means:
         SimpleMatrix means = new SimpleMatrix(m_dimensions, 1);
-        for(int r=0; r<m_dimensions; r++ ){
+        for (int r = 0; r < m_dimensions; r++) {
             means.set(r, 0, Xt.extractVector(true, r).elementSum() / n_samples);
         }
 
         // Covariance matrix:
         SimpleMatrix cov_matrix = new SimpleMatrix(m_dimensions, m_dimensions);
-        for(int r=0; r<m_dimensions; r++){
-            for(int c=0; c<m_dimensions; c++){
-                if(r > c){
+        for (int r = 0; r < m_dimensions; r++) {
+            for (int c = 0; c < m_dimensions; c++) {
+                if (r > c) {
                     cov_matrix.set(r, c, cov_matrix.get(c, r));
                 } else {
-                    double cov = Xt.extractVector(true, r).minus( means.get((r), 0) ).dot(Xt.extractVector(true, c).minus( means.get((c), 0) ).transpose());
-                    cov_matrix.set(r, c, (cov / (n_samples-1)));
+                    double cov = Xt.extractVector(true, r).minus(means.get((r), 0)).dot(Xt.extractVector(true, c).minus(means.get((c), 0)).transpose());
+                    cov_matrix.set(r, c, (cov / (n_samples - 1)));
                 }
             }
         }
