@@ -14,7 +14,7 @@ import java.util.TreeSet;
 
 public class EllipsoidQuantile {
 
-    public Object[] ellipsoidQuantile(SimpleMatrix data, float quantil){
+    public static Object[] ellipsoidQuantile(SimpleMatrix data, double quantil){
         // data: sample per row, dimension per column (i.e. numpy default)
         //TODO po przetestowaniu zoptymalizowac //mniej linii, mniej obiektow, mniej wszystkiego
         assert 0 < quantil;
@@ -36,13 +36,14 @@ public class EllipsoidQuantile {
         // distances from the mean in the 'circular' space
         SimpleMatrix xcen = data.copy();
         for (int r=0; r < xcen.numRows(); r++){
-            SimpleMatrix xcen_row = xcen.extractVector(true, r).minus(mean);
+            SimpleMatrix xcen_row = xcen.extractVector(true, r).minus(mean.transpose());
             for(int c=0; c<xcen.numCols(); c++){
                 xcen.set(r, c, xcen_row.get(0, c));
             }
         }
+        // extractDiag = yes, we do calculate n^2 things instead of n. Might be optimised later.
+        SimpleMatrix circled_data_tmp = xcen.mult(inv_cov).mult(xcen.transpose()).extractDiag();
 
-        SimpleMatrix circled_data_tmp = xcen.transpose().mult(inv_cov).mult(xcen);
         circled_data_tmp = circled_data_tmp.elementPower(0.5);
         double[] circled_data = circled_data_tmp.getMatrix().data;
         Arrays.sort(circled_data);
@@ -65,12 +66,13 @@ public class EllipsoidQuantile {
         while(itr.hasNext()){
             int how_many = n_at_distance.get(itr.next());
             qlevel[idx] = qlevel[idx - 1] + how_many;
+            idx++;
         }
 
         for(int i=0; i<qlevel.length; i++) {
             qlevel[i] = (n - qlevel[i]) / n;
         }
-        qlevel = Arrays.copyOfRange(qlevel, 0, qlevel.length - 1);
+        qlevel = Arrays.copyOfRange(qlevel, 1, qlevel.length);
 
         // ========================
 
@@ -116,7 +118,7 @@ public class EllipsoidQuantile {
 
         // ========================
 
-        SimpleEVD EVD_new_cov = cov.eig();
+        SimpleEVD EVD_new_cov = new_covariance.eig();
         Complex64F[] new_covariance_eigen_values = new Complex64F[EVD_new_cov.getNumberOfEigenvalues()];
         for (int i = 0; i < new_covariance_eigen_values.length; i++) {
             new_covariance_eigen_values[i] = EVD_new_cov.getEigenvalue(i);
